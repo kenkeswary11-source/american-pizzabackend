@@ -118,13 +118,54 @@ app.get('/api', (req, res) => {
 });
 
 // Routes
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/products', require('./routes/productRoutes'));
-app.use('/api/orders', require('./routes/orderRoutes'));
-app.use('/api/reviews', require('./routes/reviewRoutes'));
-app.use('/api/offers', require('./routes/offerRoutes'));
-app.use('/api/delivery', require('./routes/deliveryRoutes'));
-app.use('/api/sales', require('./routes/salesRoutes'));
+try {
+  app.use('/api/auth', require('./routes/authRoutes'));
+  console.log('✓ Auth routes loaded');
+} catch (err) {
+  console.error('✗ Failed to load auth routes:', err);
+}
+
+try {
+  app.use('/api/products', require('./routes/productRoutes'));
+  console.log('✓ Product routes loaded');
+} catch (err) {
+  console.error('✗ Failed to load product routes:', err);
+}
+
+try {
+  app.use('/api/orders', require('./routes/orderRoutes'));
+  console.log('✓ Order routes loaded');
+} catch (err) {
+  console.error('✗ Failed to load order routes:', err);
+}
+
+try {
+  app.use('/api/reviews', require('./routes/reviewRoutes'));
+  console.log('✓ Review routes loaded');
+} catch (err) {
+  console.error('✗ Failed to load review routes:', err);
+}
+
+try {
+  app.use('/api/offers', require('./routes/offerRoutes'));
+  console.log('✓ Offer routes loaded');
+} catch (err) {
+  console.error('✗ Failed to load offer routes:', err);
+}
+
+try {
+  app.use('/api/delivery', require('./routes/deliveryRoutes'));
+  console.log('✓ Delivery routes loaded');
+} catch (err) {
+  console.error('✗ Failed to load delivery routes:', err);
+}
+
+try {
+  app.use('/api/sales', require('./routes/salesRoutes'));
+  console.log('✓ Sales routes loaded');
+} catch (err) {
+  console.error('✗ Failed to load sales routes:', err);
+}
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
