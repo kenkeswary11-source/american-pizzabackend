@@ -87,10 +87,16 @@ router.post('/', protect, admin, upload.single('image'), async (req, res) => {
         throw new Error('No upload preset configured');
       }
     } catch (presetError) {
-      // If preset fails (e.g., preset not found), try signed upload as fallback
-      if (presetError.message && presetError.message.includes('preset')) {
+      // Check if it's a preset-related error (preset not found, invalid preset, etc.)
+      const isPresetError = presetError.message && (
+        presetError.message.toLowerCase().includes('preset') ||
+        presetError.message.toLowerCase().includes('upload preset') ||
+        (presetError.http_code === 400 && presetError.message.includes('not found'))
+      );
+      
+      if (isPresetError) {
         console.warn('Upload preset failed, trying signed upload as fallback...');
-        console.warn('Preset error:', presetError.message);
+        console.warn('Preset error:', presetError.message || presetError);
         
         try {
           // Fallback: Use signed upload (requires API secret)
@@ -101,10 +107,15 @@ router.post('/', protect, admin, upload.single('image'), async (req, res) => {
           });
           console.log('✓ Signed upload successful (fallback)');
         } catch (signedError) {
-          console.error('Both preset and signed upload failed:', signedError);
+          console.error('Both preset and signed upload failed:');
+          console.error('Preset error:', presetError.message || presetError);
+          console.error('Signed error:', signedError.message || signedError);
           return res.status(500).json({ 
-            message: 'Failed to upload image to Cloudinary. Please create an upload preset named "' + uploadPreset + '" in your Cloudinary dashboard, or ensure your Cloudinary API credentials are correct.',
-            error: process.env.NODE_ENV !== 'production' ? signedError.message : undefined
+            message: 'Failed to upload image to Cloudinary. Error: ' + (signedError.message || 'Unknown error') + '. Please check your Cloudinary configuration and ensure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET are set correctly.',
+            error: process.env.NODE_ENV !== 'production' ? {
+              presetError: presetError.message,
+              signedError: signedError.message
+            } : undefined
           });
         }
       } else {
