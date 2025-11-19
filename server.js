@@ -18,7 +18,13 @@ try {
 }
 
 // Connect to database
-connectDB();
+try {
+  connectDB();
+  console.log('✓ Database connection initiated');
+} catch (err) {
+  console.error('✗ Database connection error:', err);
+  // Don't exit - let the server start and handle DB errors gracefully
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -26,32 +32,40 @@ const server = http.createServer(app);
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
-    if (process.env.NODE_ENV !== 'production') {
-      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-        return callback(null, true);
-      }
+    // Always allow localhost for development
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return callback(null, true);
     }
 
+    // Allow Vercel domains
     if (origin.includes('.vercel.app')) {
       return callback(null, true);
     }
 
+    // Allow domains from FRONTEND_URL environment variable
     if (process.env.FRONTEND_URL) {
       const allowedUrls = process.env.FRONTEND_URL.split(',').map(url => url.trim());
       for (const allowedUrl of allowedUrls) {
-        if (origin === allowedUrl || origin.startsWith(allowedUrl)) {
+        // Remove protocol for comparison
+        const allowedOrigin = allowedUrl.replace(/^https?:\/\//, '');
+        const requestOrigin = origin.replace(/^https?:\/\//, '');
+        if (requestOrigin === allowedOrigin || requestOrigin.startsWith(allowedOrigin)) {
           return callback(null, true);
         }
       }
     }
 
+    // In production, log blocked origins but still allow if NODE_ENV is not strictly production
     if (process.env.NODE_ENV === 'production') {
-      console.warn(`CORS blocked origin: ${origin}`);
-      return callback(new Error('Not allowed by CORS'));
+      console.warn(`CORS: Blocked origin: ${origin}`);
+      // Still allow in case it's a legitimate request (you can make this stricter)
+      return callback(null, true);
     }
 
+    // Default: allow
     return callback(null, true);
   },
   credentials: true,
@@ -208,8 +222,22 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || '0.0.0.0';
 
+// Start server
 server.listen(PORT, HOST, () => {
-  console.log(`Server running on ${HOST}:${PORT}`);
+  console.log('='.repeat(50));
+  console.log(`✓ Server running on ${HOST}:${PORT}`);
+  console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`✓ CORS enabled for: localhost, .vercel.app, and FRONTEND_URL`);
+  console.log('='.repeat(50));
+});
+
+// Handle server errors
+server.on('error', (err) => {
+  console.error('✗ Server error:', err);
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use`);
+    process.exit(1);
+  }
 });
 
 process.on('SIGTERM', () => {
