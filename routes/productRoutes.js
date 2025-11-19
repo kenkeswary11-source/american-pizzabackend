@@ -71,10 +71,18 @@ router.post('/', protect, admin, upload.single('image'), async (req, res) => {
 
     console.log('Uploading to Cloudinary...');
     // Upload to Cloudinary using UNSIGNED preset (no signature required)
+    const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET || "pizza_unsigned";
+    
+    if (!uploadPreset) {
+      return res.status(500).json({ 
+        message: 'Cloudinary upload preset not configured. Please set CLOUDINARY_UPLOAD_PRESET environment variable.'
+      });
+    }
+
     let uploaded;
     try {
       uploaded = await cloudinary.uploader.upload(dataUri, {
-        upload_preset: "pizza_unsigned",   // <<< MUST MATCH CLOUDINARY PRESET NAME
+        upload_preset: uploadPreset,
         folder: "american_pizza",
         resource_type: "image"
       });
@@ -154,8 +162,9 @@ router.put('/:id', protect, admin, upload.single('image'), async (req, res) => {
       const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
 
       // Upload new image to Cloudinary
+      const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET || "pizza_unsigned";
       const uploaded = await cloudinary.uploader.upload(dataUri, {
-        upload_preset: "pizza_unsigned",
+        upload_preset: uploadPreset,
         folder: "american_pizza",
         resource_type: "image"
       });

@@ -92,9 +92,10 @@ router.post('/', protect, admin, upload.single('image'), async (req, res) => {
     let cloudinaryId = '';
     if (req.file) {
       try {
+        const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET || "pizza_unsigned";
         const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
         const uploaded = await cloudinary.uploader.upload(dataUri, {
-          upload_preset: "pizza_unsigned",
+          upload_preset: uploadPreset,
           folder: "american_pizza",
           resource_type: "image"
         });
@@ -176,9 +177,10 @@ router.put('/:id', protect, admin, upload.single('image'), async (req, res) => {
       }
       // Upload new image to Cloudinary
       try {
+        const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET || "pizza_unsigned";
         const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
         const uploaded = await cloudinary.uploader.upload(dataUri, {
-          upload_preset: "pizza_unsigned",
+          upload_preset: uploadPreset,
           folder: "american_pizza",
           resource_type: "image"
         });
