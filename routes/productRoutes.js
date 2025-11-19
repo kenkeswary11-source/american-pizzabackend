@@ -40,24 +40,60 @@ router.get('/:id', async (req, res) => {
 // POST create product (admin only)
 router.post('/', protect, admin, upload.single('image'), async (req, res) => {
   try {
+    console.log('POST /api/products - Request received');
+    console.log('Request body:', {
+      name: req.body.name,
+      description: req.body.description,
+      category: req.body.category,
+      price: req.body.price,
+      featured: req.body.featured
+    });
+    console.log('File received:', req.file ? {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    } : 'No file');
+
     if (!req.file) {
       return res.status(400).json({ message: 'Image file is required' });
+    }
+
+    // Check Cloudinary configuration
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      console.error('Cloudinary configuration missing!');
+      return res.status(500).json({ 
+        message: 'Cloudinary configuration is missing. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET environment variables.'
+      });
     }
 
     // Convert buffer to data URI for Cloudinary upload
     const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
 
+    console.log('Uploading to Cloudinary...');
     // Upload to Cloudinary using UNSIGNED preset (no signature required)
-    const uploaded = await cloudinary.uploader.upload(dataUri, {
-      upload_preset: "pizza_unsigned",   // <<< MUST MATCH CLOUDINARY PRESET NAME
-      folder: "american_pizza",
-      resource_type: "image"
-    });
-
-    if (!uploaded || !uploaded.secure_url) {
-      throw new Error('Failed to upload image to Cloudinary');
+    let uploaded;
+    try {
+      uploaded = await cloudinary.uploader.upload(dataUri, {
+        upload_preset: "pizza_unsigned",   // <<< MUST MATCH CLOUDINARY PRESET NAME
+        folder: "american_pizza",
+        resource_type: "image"
+      });
+    } catch (cloudinaryError) {
+      console.error('Cloudinary upload error:', cloudinaryError);
+      return res.status(500).json({ 
+        message: 'Failed to upload image to Cloudinary: ' + (cloudinaryError.message || 'Unknown error'),
+        details: process.env.NODE_ENV !== 'production' ? cloudinaryError.message : undefined
+      });
     }
 
+    if (!uploaded || !uploaded.secure_url) {
+      throw new Error('Failed to upload image to Cloudinary - no secure URL returned');
+    }
+
+    console.log('Image uploaded successfully:', uploaded.secure_url);
+
+    // Create product
+    console.log('Creating product in database...');
     const product = await Product.create({
       name: req.body.name,
       description: req.body.description,
@@ -68,12 +104,23 @@ router.post('/', protect, admin, upload.single('image'), async (req, res) => {
       featured: req.body.featured === "true"
     });
 
+    console.log('Product created successfully:', product._id);
     res.status(201).json(product);
 
   } catch (err) {
     console.error("Product Creation Error:", err);
+    console.error("Error stack:", err.stack);
+    
     // Provide more detailed error message
-    const errorMessage = err.message || 'Failed to create product';
+    let errorMessage = err.message || 'Failed to create product';
+    
+    // Handle validation errors
+    if (err.name === 'ValidationError') {
+      const messages = Object.values(err.errors).map(e => e.message).join(', ');
+      errorMessage = messages || 'Validation error';
+      return res.status(400).json({ message: errorMessage });
+    }
+
     res.status(500).json({ 
       message: errorMessage,
       error: process.env.NODE_ENV !== 'production' ? err.stack : undefined
