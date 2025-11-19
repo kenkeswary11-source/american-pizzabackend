@@ -2,6 +2,7 @@ const express = require('express');
 const Offer = require('../models/Offer');
 const { protect, admin } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const cloudinary = require('../config/cloudinary');
 
 const router = express.Router();
 
@@ -86,6 +87,30 @@ router.post('/', protect, admin, upload.single('image'), async (req, res) => {
       return res.status(400).json({ message: 'Offer code already exists' });
     }
 
+    // Upload image to Cloudinary if provided
+    let imageUrl = '';
+    let cloudinaryId = '';
+    if (req.file) {
+      try {
+        const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+        const uploaded = await cloudinary.uploader.upload(dataUri, {
+          upload_preset: "pizza_unsigned",
+          folder: "american_pizza",
+          resource_type: "image"
+        });
+        if (!uploaded || !uploaded.secure_url) {
+          throw new Error('Failed to upload image to Cloudinary');
+        }
+        imageUrl = uploaded.secure_url;
+        cloudinaryId = uploaded.public_id;
+      } catch (uploadError) {
+        console.error('Cloudinary upload error:', uploadError);
+        return res.status(500).json({ 
+          message: 'Failed to upload image: ' + uploadError.message 
+        });
+      }
+    }
+
     const offer = await Offer.create({
       title: title.trim(),
       description: description.trim(),
@@ -94,7 +119,8 @@ router.post('/', protect, admin, upload.single('image'), async (req, res) => {
       validFrom: fromDate,
       validUntil: untilDate,
       minOrderAmount: minOrderAmount && minOrderAmount !== '' ? parseFloat(minOrderAmount) : 0,
-      image: req.file ? req.file.filename : '',
+      image: imageUrl,
+      cloudinary_id: cloudinaryId,
     });
 
     res.status(201).json(offer);
@@ -140,7 +166,33 @@ router.put('/:id', protect, admin, upload.single('image'), async (req, res) => {
     if (minOrderAmount !== undefined) offer.minOrderAmount = parseFloat(minOrderAmount);
     // Update image only if a new file is uploaded
     if (req.file) {
-      offer.image = req.file.filename;
+      // Delete old image from Cloudinary if it exists
+      if (offer.cloudinary_id) {
+        try {
+          await cloudinary.uploader.destroy(offer.cloudinary_id);
+        } catch (error) {
+          console.error('Error deleting old image from Cloudinary:', error);
+        }
+      }
+      // Upload new image to Cloudinary
+      try {
+        const dataUri = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+        const uploaded = await cloudinary.uploader.upload(dataUri, {
+          upload_preset: "pizza_unsigned",
+          folder: "american_pizza",
+          resource_type: "image"
+        });
+        if (!uploaded || !uploaded.secure_url) {
+          throw new Error('Failed to upload image to Cloudinary');
+        }
+        offer.image = uploaded.secure_url;
+        offer.cloudinary_id = uploaded.public_id;
+      } catch (uploadError) {
+        console.error('Cloudinary upload error:', uploadError);
+        return res.status(500).json({ 
+          message: 'Failed to upload image: ' + uploadError.message 
+        });
+      }
     }
 
     await offer.save();

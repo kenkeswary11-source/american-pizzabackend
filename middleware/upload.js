@@ -1,15 +1,8 @@
 const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const cloudinary = require("../config/cloudinary");
 
-// Configure Cloudinary storage
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "american_pizza_products",
-    allowed_formats: ["jpg", "jpeg", "png", "webp"],
-  },
-});
+// Use memory storage instead of CloudinaryStorage to avoid signature issues
+// Files will be uploaded directly to Cloudinary in the route handlers using unsigned presets
+const storage = multer.memoryStorage();
 
 // Optional file filter
 const fileFilter = (req, file, cb) => {
@@ -27,6 +20,9 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
 });
 
 module.exports = upload;

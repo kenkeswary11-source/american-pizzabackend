@@ -41,6 +41,10 @@ const offerSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  cloudinary_id: {
+    type: String,
+    default: '',
+  },
 }, {
   timestamps: true,
 });
